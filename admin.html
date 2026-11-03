@@ -54,6 +54,9 @@
       <div class="row"><label><b>Durasi menjawab per soal</b> <input id="qzSlot" type="number" min="5" max="300" step="1" style="width:80px" aria-label="Durasi menjawab per soal dalam detik"> detik</label>
         <span class="mu">Pilih cepat:</span><button type="button" data-slot="10">10</button><button type="button" data-slot="15">15</button><button type="button" data-slot="20">20</button><button type="button" data-slot="30">30</button><button type="button" data-slot="45">45</button><button type="button" data-slot="60">60</button>
         <span id="qzSlotNote" class="mu"></span></div>
+      <div class="row"><label><b>Cara penilaian</b> <select id="qzScore" aria-label="Cara penilaian">
+        <option value="tetap">Jawaban benar = 10 (tanpa adu cepat)</option><option value="kecepatan">Berdasarkan kecepatan (benar bernilai 7–10; tercepat 10)</option></select></label>
+        <span id="qzScoreNote" class="mu"></span></div>
       <fieldset class="dt"><legend>Jadwal kuis (zona waktu mengikuti perangkat Anda)</legend>
         <div class="row"><b class="lbl">Mulai</b><input id="qzStartD" type="date" aria-label="Tanggal mulai"><button type="button" data-pick="qzStartD" title="Pilih tanggal">📅</button>
           <input id="qzStartT" type="time" step="60" aria-label="Jam mulai"><button type="button" data-pick="qzStartT" title="Pilih jam">🕐</button></div>
@@ -214,7 +217,7 @@ const faseLabel = { Live: 'Berlangsung', Scheduled: 'Terjadwal', Finished: 'Sele
 function drawQuizzes() {
   const keepH = $('hQuiz').value, keepM = $('mQuiz').value;
   quizzes.sort((x, y) => (faseOrder[x.fase] - faseOrder[y.fase]) || (y.startAt - x.startAt));
-  fill($('qzTable'), ['Judul', 'Fase', 'Soal', 'Durasi/soal', 'Mulai', 'Berakhir', ''], quizzes.map(q => { const done = q.status !== 'draft' && q.fase !== 'Scheduled'; return [q.judul + (q.kelas ? ' [' + q.kelas + ']' : ''), faseLabel[q.fase] || q.fase, String(q.jumlahSoal), q.durasiDetik + ' dtk', fmtTime(q.startAt), fmtTime(q.endedAt || q.endAt),
+  fill($('qzTable'), ['Judul', 'Fase', 'Soal', 'Durasi/soal', 'Penilaian', 'Mulai', 'Berakhir', ''], quizzes.map(q => { const done = q.status !== 'draft' && q.fase !== 'Scheduled'; return [q.judul + (q.kelas ? ' [' + q.kelas + ']' : ''), faseLabel[q.fase] || q.fase, String(q.jumlahSoal), q.durasiDetik + ' dtk', (q.modeNilai === 'tetap' ? 'Benar = 10' : 'Kecepatan 7–10'), fmtTime(q.startAt), fmtTime(q.endedAt || q.endAt),
     h('span', {}, btn('Edit', () => fillQuiz(q)), btn('Soal', () => openQ(q)), btn('Peserta', () => openP(q)),
       done ? btn(q.fase === 'Live' ? 'Peringkat live' : 'Peringkat', () => openRanking(q.id), 'pr') : '', done ? btn('Unduh nilai', () => exportCsv('ringkas', q.id)) : '',
       btn('Duplikat', () => run(async () => { await api({ action: 'duplicateQuiz', id: q.id }); ok('Salinan dibuat sebagai draft.'); loadQuizzes(); })),
@@ -227,7 +230,7 @@ function drawQuizzes() {
   if (pendingQuiz) { const id = pendingQuiz; pendingQuiz = null; $('hQuiz').value = id; loadRanking(true); }
 }
 function archive(q) { run(async () => { await api(Object.assign(quizBody(q), { action: 'saveQuiz', status: 'archived' })); ok('Kuis diarsipkan.'); loadQuizzes(); }); }
-const quizBody = q => ({ durasiDetik: q.durasiDetik, id: q.id, judul: q.judul, deskripsi: q.deskripsi, mapel: q.mapel, kelas: q.kelas, pesertaMode: q.pesertaMode, status: q.status, startAt: q.startAt, endAt: q.endAt, showResults: q.showResults });
+const quizBody = q => ({ modeNilai: q.modeNilai, durasiDetik: q.durasiDetik, id: q.id, judul: q.judul, deskripsi: q.deskripsi, mapel: q.mapel, kelas: q.kelas, pesertaMode: q.pesertaMode, status: q.status, startAt: q.startAt, endAt: q.endAt, showResults: q.showResults });
 function fillQuiz(q) {
   editQuiz = q ? q.id : null; editCount = q ? q.jumlahSoal : 0; $('qzTitle').textContent = q ? 'Edit kuis' : 'Kuis baru';
   $('qzJudul').value = q ? q.judul : ''; $('qzMapel').value = q ? q.mapel : ''; $('qzKelas').value = q ? q.kelas : ''; $('qzDesk').value = q ? q.deskripsi : '';
@@ -235,6 +238,7 @@ function fillQuiz(q) {
   writeDT('qzStartD', 'qzStartT', q ? q.startAt : 0); writeDT('qzEndD', 'qzEndT', q ? q.endAt : 0); $('qzDur').value = q ? Math.round((q.endAt - q.startAt) / 60000) : '';
   const started = !!q && q.status === 'published' && q.fase !== 'Scheduled';   // status dari jam server, bukan jam perangkat
   $('qzSlot').value = q ? q.durasiDetik : slotSec; $('qzSlot').disabled = started;
+  $('qzScore').value = q ? q.modeNilai : 'tetap'; $('qzScore').disabled = started; $('qzScoreNote').textContent = started ? '🔒 terkunci karena kuis sudah dimulai' : '';
   document.querySelectorAll('[data-slot]').forEach(b => b.disabled = started); $('qzSlotNote').textContent = started ? '🔒 terkunci karena kuis sudah dimulai' : '';
   qzSummary();
 }
@@ -289,7 +293,7 @@ $('btnSaveQz').onclick = () => run(async () => {
   if (e <= s) throw bad('Waktu berakhir harus setelah waktu mulai');
   if (editCount > 0 && e - s < editCount * slotSec * 1000 && !confirm('Jadwal lebih pendek dari ' + fmtDur(editCount * slotSec * 1000) + '; soal terakhir akan terpotong. Tetap simpan?')) return;
   await api({ action: 'saveQuiz', id: editQuiz, judul: val('qzJudul'), mapel: val('qzMapel'), kelas: val('qzKelas'), deskripsi: val('qzDesk'), pesertaMode: $('qzMode').value, status: $('qzStatus').value,
-    showResults: $('qzShow').checked, startAt: s, endAt: e, durasiDetik: slot });
+    showResults: $('qzShow').checked, startAt: s, endAt: e, durasiDetik: slot, modeNilai: $('qzScore').value });
   ok('Kuis disimpan.'); fillQuiz(null); loadQuizzes();
 });
 
@@ -350,7 +354,7 @@ const medal = r => (r === 1 ? '🥇 ' : r === 2 ? '🥈 ' : r === 3 ? '🥉 ' : 
 function loadRanking(first) { return run(async () => {
   const quizId = $('hQuiz').value; if (!quizId) return;
   const d = await api({ action: 'leaderboard', quizId }); curLb = d;
-  const prog = d.progress ? ' · soal selesai dinilai ' + d.progress.selesai + '/' + d.progress.total : '', clock = ' · diperbarui ' + new Date().toLocaleTimeString('id-ID');
+  const prog = (d.progress ? ' · soal selesai dinilai ' + d.progress.selesai + '/' + d.progress.total : '') + ' · penilaian: ' + (d.mode === 'tetap' ? 'benar = 10' : 'kecepatan 7–10'), clock = ' · diperbarui ' + new Date().toLocaleTimeString('id-ID');
   $('hStat').className = d.status === 'Live' ? 'live' : 'mu';
   $('hStat').textContent = d.status === 'Live' ? '🔴 LIVE — peringkat sementara' + prog + clock
     : d.final ? '✅ Hasil FINAL' + prog : 'Hasil SEMENTARA (' + (d.status === 'Finished' ? 'masih ada jawaban yang belum diperiksa' : 'kuis belum dimulai') + ')' + prog;
