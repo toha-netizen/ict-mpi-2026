@@ -109,7 +109,8 @@ function drawDash(d) {
     if (cd) cd.querySelector('.cd').dataset.start = k.startAt;
     box.append(h('div', { className: 'card' }, h('div', { className: 'row' }, h('b', { textContent: k.judul }), h('span', { className: 'badge ' + k.status, textContent: lab })),
       k.mapel ? h('div', { className: 'mu', textContent: k.mapel }) : '', k.deskripsi ? h('p', { textContent: k.deskripsi }) : '',
-      h('div', { className: 'mu', textContent: 'Mulai ' + fmt(k.startAt) + ' · Berakhir ' + fmt(k.endAt) + ' · ' + k.jumlahSoal + ' soal · ' + k.durasiDetik + ' detik per soal' }), cd, act));
+      h('div', { className: 'mu', textContent: 'Mulai ' + fmt(k.startAt) + ' · Berakhir ' + fmt(k.endAt) + ' · ' + k.jumlahSoal + ' soal · ' + k.durasiDetik + ' detik per soal' }),
+      h('div', { className: 'mu', textContent: 'Penilaian: ' + (k.penilaian === 'tetap' ? 'setiap jawaban benar bernilai 10 (tanpa adu cepat)' : 'jawaban benar bernilai 7–10; makin cepat makin tinggi') }), cd, act));
   });
   tickDash();
 }
@@ -185,7 +186,8 @@ async function showResult(id, judul) {
       const r = me.ringkas; $('rSum').replaceChildren(...[['Total', r.total.toFixed(2)], ['Peringkat', r.peringkat + '/' + me.peserta], ['Benar', r.benar], ['Salah', r.salah], ['Kosong', r.kosong]].map(([t, v]) => h('div', {}, h('b', { textContent: String(v) }), t)));
     } else $('rMsg').textContent += ' Anda tidak tercatat memiliki nilai pada kuis ini.';
     const lab = { benar: 'Benar', salah: 'Salah', kosong: 'Tidak menjawab', pending: 'Menunggu pemeriksaan' };
-    fill($('rDetail'), ['No', 'Status', 'Urutan', 'Nilai'], me.soal.map(s => [s.no, lab[s.status] || s.status, s.urutan === '' ? '-' : s.urutan + ' dari ' + s.jumlahBenar, Number(s.nilai).toFixed(2)]));
+    if (me.mode === 'tetap') fill($('rDetail'), ['No', 'Status', 'Nilai'], me.soal.map(s => [s.no, lab[s.status] || s.status, Number(s.nilai).toFixed(2)]));
+    else fill($('rDetail'), ['No', 'Status', 'Urutan', 'Nilai'], me.soal.map(s => [s.no, lab[s.status] || s.status, s.urutan === '' ? '-' : s.urutan + ' dari ' + s.jumlahBenar, Number(s.nilai).toFixed(2)]));
     fill($('rLb'), ['#', 'Nama', 'Nilai', 'Benar'], lb.rows.map(r => [r.rank, r.nama, Number(r.skor).toFixed(2), r.benar]), lb.rows.findIndex(r => r.saya));
   } catch (e) {
     if (e.code === 'SESSION_EXPIRED') return fail(e);
